@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+    <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Sint aperiam minima molestiae vero repudiandae id,
+        itaque esse quas pariatur labore fuga repellat et harum tempore maiores iure quae doloribus minus.</p>
+
+    <script src="https://js.sentry-cdn.com/1f76b334106769b9d015a5d173862544.min.js" crossorigin="anonymous"></script>
+
+    <script src="https://browser.sentry-cdn.com/7.100.0/bundle.tracing.min.js"
+        integrity="sha384-UYOt6OZnoMh+TIldEWwYWaaAThAnFLqlAnbrOba0tvn6OBGWk4uWseoFKVfUG2YR"
+        crossorigin="anonymous"></script>
+
+    <script>
+        Sentry.init({
+            dsn: "https://1f76b334106769b9d015a5d173862544@o4506699316461568.ingest.sentry.io/4506699319214080",
+            release: "my-project-name@2.3.12",
+            integrations: [
+                Sentry.replayIntegrations(),
+            ],
+            tracesSampleRate: 1.0,
+            replaysSessionSampleRate: 0.1,
+            replaysOnErrorSampleRate: 1.0,
+        });
+
+        try {
+            let mystr = "two" + 2;
+            console.log("hello", mystr); // Fixed the syntax here
+        } catch (ken) {
+            console.log("error is.....", ken);
+        }
+    </script>
+
+</body>
+
+</html>
