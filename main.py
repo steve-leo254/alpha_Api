@@ -1,8 +1,7 @@
 import sentry_sdk
-from flask import Flask, Request
+from flask import request
 from sentry_sdk import capture_exception
-from flask_sqlalchemy import SQLAlchemy
-from dds import Product
+from dds import Product,app,db
 
 
 sentry_sdk.init(
@@ -17,26 +16,24 @@ sentry_sdk.init(
 )
 # division_by_zero = 1 / 0
 
-app=Flask(__name__)
-app.secret_key='secretkey'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:leo.steve@localhost/alpha-product'
-db = SQLAlchemy
+@app.before_first_request
+def create_table():
+    db.create_all()
 
-@app.route("/products", methods["POST","GET"])
+@app.route("/products", methods=["POST","GET"])
 def prods():
     if request.method == "GET":
-    try:
-        prods = product.queryall()
-        print(prods)
-        return "success"
+        try:
+            prods = Product.queryall()
+            print(prods)
+            return "success"
     
-    
-    except Exception as e:
-        capture_exception(e)
+        except Exception as e:
+         capture_exception(e)
         return "error"
     else:
-        if Request.s_json:
-            data = Request.json
+        if request.is_json:
+            data = request.json
             print
     
 app.run()
