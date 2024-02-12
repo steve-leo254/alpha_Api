@@ -32,8 +32,9 @@
         try {
             let mystr = "two" + 2;
             console.log("hello", mystr); // Fixed the syntax here
-        } catch (ken) {
-            console.log("error is.....", ken);
+        } catch (steve) {
+            Sentry.captureException(steve);
+            console.log("error is.....",steve)
         }
     </script>
 
