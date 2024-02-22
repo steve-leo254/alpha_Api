@@ -79,41 +79,41 @@ def get_product(product_id):
         return jsonify({"error": "Internal Server Error"}), 500
 
 
-@app.route('/sales', methods=['GET', 'POST'])
+
+@app.route('/sales',methods=['GET','POST'])
 def sales():
     if request.method == 'GET':
         try:
-            sales = Sales.query.all()
-            s_dict = []
+            sales=Sales.query.all()
+            s_dict=[]
             for sale in sales:
-                s_dict.append({
-                    "id": sale.id,
-                    "pid": sale.pid,  # Corrected the attribute name
-                    "quantity": sale.quantity,  # Corrected the attribute name
-                    "created_at": sale.created_at
-                })
+                s_dict.append({"id": sale.id, "pid": sale.pid, "quantity": sale.quantity,"created_at": sale.created_at})
             return jsonify(s_dict)
         except Exception as e:
             print(e)
-            return jsonify({"error": "Internal Server Error"}), 500
-
-    elif request.method == "POST":
+            # capture_exception(e)
+            return jsonify({})
+        
+    elif request.method == 'POST':
         if request.is_json:
             try:
                 data = request.json
-                new_sale = Sales(pid=data.get('pid'), quantity=data.get('quantity'))  # Corrected attribute names
+                new_sale = Sales(pid=data.get(
+                    'pid'), quantity=data.get('quantity'))
                 db.session.add(new_sale)
                 db.session.commit()
-                result_message = "Sale added successfully. Sale ID: " + str(new_sale.id)
-                result = {"result": result_message}
-                return jsonify(result), 201
+                s = "sales added successfully." + str(new_sale.id)
+                sel = {"result": s}
+                return jsonify(sel), 201
             except Exception as e:
                 print(e)
+                # capture_exception(e)
                 return jsonify({"error": "Internal Server Error"}), 500
         else:
             return jsonify({"error": "Data is not JSON."}), 400
     else:
         return jsonify({"error": "Method not allowed."}), 400
+
 
 
 
