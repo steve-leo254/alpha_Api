@@ -155,11 +155,12 @@ def sales():
 
 @app.route('/dashboard', methods=["GET"])
 def dashboard():
-   
-    # Query to get sales per day
+   # Query to get sales per day
     sale_per_day = db.session.query(
-        func.date(Sale.created_at).label('date'),# extracts date from created at
-        func.sum(Sale.quantity *Product.price).label('total_sale')# calculate the total number of sales per day
+        # extracts date from created at
+        func.date(Sale.created_at).label('date'),
+        # calculate the total number of sales per day
+        func.sum(Sale.quantity * Product.price).label('total_sale')
     ).join(Product).group_by(
         func.date(Sale.created_at)
     ).all()
@@ -180,6 +181,7 @@ def dashboard():
                          for name, sale_product in sale_per_product]
 
     return jsonify({'sale_data': sale_data, 'saleproduct_data': saleproduct_data})
+
 
 
 
