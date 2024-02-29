@@ -153,35 +153,40 @@ def sales():
 #     else:
 #         return jsonify({"error": "Method not allowed."}), 400
 
-@app.route('/dashboard', methods=["GET"])
+
+
+@app.route('/dashboard', methods=['GET'])
 def dashboard():
-   # Query to get sales per day
-    sale_per_day = db.session.query(
-        # extracts date from created at
-        func.date(Sale.created_at).label('date'),
-        # calculate the total number of sales per day
-        func.sum(Sale.quantity * Product.price).label('total_sale')
-    ).join(Product).group_by(
-        func.date(Sale.created_at)
-    ).all()
+    try:
+        # Query to get sales per day
+        sale_per_day = db.session.query(
+            func.date(Sale.created_at).label('date'),  # extracts date from created at
+            func.sum(Sale.quantity * Product.price).label('total_sale')  # calculate the total number of sales per day
+        ).join(Product).group_by(
+            func.date(Sale.created_at)
+        ).all()
 
-    #  to JSON format
-    sale_data = [{'date': str(day), 'total_sale': sale}
-                  for day, sale in sale_per_day]
-    #  sales per product
-    sale_per_product = db.session.query(
-        Product.name,
-        func.sum(Sale.quantity*Product.price).label('sale_product')
-    ).join(Sale).group_by(
-        Product.name
-    ).all()
+        # Convert the result to JSON format
+        sale_data = [{'date': str(day), 'total_sale': total_sale}
+                     for day, total_sale in sale_per_day]
 
-    # to JSON format
-    saleproduct_data = [{'name': name, 'sale_product': sale_product}
-                         for name, sale_product in sale_per_product]
+        # Query to get sales per product
+        sale_per_product = db.session.query(
+            Product.name,
+            func.sum(Sale.quantity * Product.price).label('sale_product')
+        ).join(Sale).group_by(
+            Product.name
+        ).all()
 
-    return jsonify({'sale_data': sale_data, 'saleproduct_data': saleproduct_data})
+        # Convert the result to JSON format
+        saleproduct_data = [{'name': name, 'sale_product': sale_product}
+                             for name, sale_product in sale_per_product]
 
+        return jsonify({'sale_data': sale_data, 'saleproduct_data': saleproduct_data})
+
+    except Exception as e:
+        print(e)
+        return jsonify({"error": "Internal Server Error"}), 500
 
 
 
