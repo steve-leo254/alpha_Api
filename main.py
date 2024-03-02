@@ -3,12 +3,14 @@ import sentry_sdk
 from flask import flash, jsonify, request
 from sentry_sdk import capture_exception
 from flask_sqlalchemy import SQLAlchemy
-from dds import Product, app, db, Sale
+from dds import Product, User,app, db, Sale
 from flask_cors import CORS
 import requests
 from sqlalchemy import func
 from datetime import datetime, date
-
+import jwt 
+from functools import wraps
+import datetime
 
 sentry_sdk.init(
     dsn="https://1f76b334106769b9d015a5d173862544@us.sentry.io/4506699319214080",
@@ -24,6 +26,60 @@ sentry_sdk.init(
 
 # store & store products
 CORS(app)
+
+from functools import wraps
+from flask import request, jsonify
+
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = request.headers.get('Authorization')
+
+        if not token:
+            return jsonify({'message': 'Token is missing!'}), 401
+
+        try:
+            data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+            current_user = User[data['username']]
+        except:
+            return jsonify({'message': 'Token is invalid!'}), 401
+
+        return f(current_user, *args, **kwargs)
+
+    return decorated
+
+
+@app.route("/register", methods=["POST"])
+def register():
+    data = request.json
+    if User.query.filter_by(username=data['username']).first() is None:
+        new_user = User(username=data['username'], password=data['password'])
+        db.session.add(new_user)
+        db.session.commit()
+        r = "User added successfully." + str(new_user.id)
+        res = {"result": r}
+        return jsonify(res), 201
+    else:
+        u = data['username']
+        return jsonify({"Result": f'Username {u} already exists'}), 400
+
+
+@app.route("/login", methods=['POST','GET'])
+def login():
+    data = request.json
+    username = data['username']
+    password = data['password']
+
+    # Assuming the password is stored as a string
+    user = User.query.filter_by(username=username).first()
+
+    if user:
+
+        token = jwt.encode({'username': username, 'exp': datetime.datetime.utcnow() 
+                            + datetime.timedelta(minutes=30)}, app.config['SECRET_KEY'])
+        return jsonify({"access_token": token}), 200
+    else:
+        return jsonify({"error": "User does not exist"}), 403
 
 
 @app.route("/products", methods=["POST", "GET", "PUT", "PATCH", "DELETE"])
@@ -81,6 +137,8 @@ def get_product(product_id):
         print(e)
         # capture_exception(e)
         return jsonify({"error": "Internal Server Error"}), 500
+    
+
 
 
 @app.route('/sale', methods=['GET', 'POST'])
