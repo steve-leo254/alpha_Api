@@ -11,6 +11,7 @@ from datetime import datetime, date
 import jwt 
 from functools import wraps
 import datetime
+from sqlalchemy.exc import IntegrityError
 
 sentry_sdk.init(
     dsn="https://1f76b334106769b9d015a5d173862544@us.sentry.io/4506699319214080",
@@ -25,10 +26,11 @@ sentry_sdk.init(
 
 
 # store & store products
-CORS(app)
+CORS(app,origins=["http://127.0.0.1:5500"], supports_credentials=True)
 
 from functools import wraps
 from flask import request, jsonify
+
 
 def token_required(f):
     @wraps(f)
@@ -39,32 +41,42 @@ def token_required(f):
             return jsonify({'message': 'Token is missing!'}), 401
 
         try:
-            data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
-            current_user = User[data['username']]
-        except:
-            return jsonify({'message': 'Token is invalid!'}), 401
+            data = jwt.decode(
+                token, app.config['SECRET_KEY'], algorithms=["HS256"])
+            current_user = data['username']
+        except jwt.ExpiredSignatureError:
+            return jsonify({'message': 'Token has expired!'}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({'message': 'Invalid token!'}), 401
 
         return f(current_user, *args, **kwargs)
 
-    return decorated
+    
 
-
-@app.route("/register", methods=["POST"])
+@app.route('/register', methods=['POST'])
 def register():
-    data = request.json
-    if User.query.filter_by(username=data['username']).first() is None:
-        new_user = User(username=data['username'], password=data['password'])
-        db.session.add(new_user)
-        db.session.commit()
-        r = "User added successfully." + str(new_user.id)
-        res = {"result": r}
-        return jsonify(res), 201
-    else:
-        u = data['username']
-        return jsonify({"Result": f'Username {u} already exists'}), 400
+    try:
+        data = request.json
+        username = data['username']
+
+        # Check if the username does not exist
+        if not User.query.filter_by(username=username).first():
+            new_user = User(username=username, password=data['password'])
+            db.session.add(new_user)
+            db.session.commit()
+            r = f"Successfully stored user with id: {str(new_user.id)}"
+            res = {"result": r}
+            return jsonify(res), 201
+        else:
+            return jsonify({'error': f'Username {username} already exists'}), 400
+    except IntegrityError as e:
+        db.session.rollback()  # Rollback the transaction to prevent partially committed data
+        return jsonify({'error': 'IntegrityError - Unique constraint violated'}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
-@app.route("/login", methods=['POST','GET'])
+@app.route("/login", methods=['POST'])
 def login():
     data = request.json
     username = data['username']
