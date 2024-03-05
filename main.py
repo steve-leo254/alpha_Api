@@ -94,7 +94,9 @@ def login():
         return jsonify({"error": "User does not exist"}), 403
 
 
-@app.route("/products", methods=["POST", "GET", "PUT", "PATCH", "DELETE"])
+
+@app.route("/products", methods=["POST", "GET"])
+# @token_required
 def prods():
     if request.method == "GET":
         try:
@@ -102,7 +104,7 @@ def prods():
             p_dict = []
             for prod in prods:
                 p_dict.append(
-                    {"id": prod.id, "name": prod.name, "price": prod.price})
+                    {"id": prod.id, "name": prod.name,"cost": prod.cost, "price": prod.price})
             return jsonify(p_dict)
         except Exception as e:
             print(e)
@@ -113,11 +115,11 @@ def prods():
         if request.is_json:
             try:
                 data = request.json
-                new_product = Product(name=data.get(
-                    'name'), price=data.get('price'))
+                new_product = Product(
+                    name=data['name'], cost=data['cost'], price=data['price'])
                 db.session.add(new_product)
                 db.session.commit()
-                r = "Product added successfully." + str(new_product.id)
+                r = "Product added successfully. ID: " + str(new_product.id)
                 res = {"result": r}
                 return jsonify(res), 201
             except Exception as e:
@@ -126,8 +128,7 @@ def prods():
                 return jsonify({"error": "Internal Server Error"}), 500
         else:
             return jsonify({"error": "Data is not JSON."}), 400
-    else:
-        return jsonify({"error": "Method not allowed."}), 400
+
 
 # Task by Thursday
 # Get a single product in the route
