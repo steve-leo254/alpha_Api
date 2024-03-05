@@ -29,7 +29,7 @@ class Sale(db.Model):
     pid = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)  
     quantity = db.Column(db.Integer, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    product = db.relationship("Product", backref='sales')  
+    # product = db.relationship("sale", backref='sale')  
 
 
 class User(db.Model):

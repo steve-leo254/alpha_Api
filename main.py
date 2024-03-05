@@ -76,7 +76,7 @@ def register():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route("/login", methods=['POST'])
+@app.route("/login", methods=['POST','GET'])
 def login():
     data = request.json
     username = data['username']
