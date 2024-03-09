@@ -12,6 +12,7 @@ import jwt
 from functools import wraps
 import datetime
 from sqlalchemy.exc import IntegrityError
+from flask_jwt_extended import decode_token
 
 sentry_sdk.init(
     dsn="https://1f76b334106769b9d015a5d173862544@us.sentry.io/4506699319214080",
@@ -28,8 +29,6 @@ sentry_sdk.init(
 # store & store products
 CORS(app,origins=["http://127.0.0.1:5500"], supports_credentials=True)
 
-from functools import wraps
-from flask import request, jsonify
 
 
 def token_required(f):
@@ -44,6 +43,13 @@ def token_required(f):
             data = jwt.decode(
                 token, app.config['SECRET_KEY'], algorithms=["HS256"])
             current_user = data['username']
+            
+             # Query the database to get the user based on the user ID
+            current_user = User.query.filter_by(username=current_user).first()
+
+            if not current_user:
+                return jsonify({'message': 'User not found!'}), 401
+
         except jwt.ExpiredSignatureError:
             return jsonify({'message': 'Token has expired!'}), 401
         except jwt.InvalidTokenError:
@@ -51,7 +57,11 @@ def token_required(f):
 
         return f(current_user, *args, **kwargs)
 
-    
+
+    return decorated
+
+
+
 
 @app.route('/register', methods=['POST'])
 def register():
@@ -70,13 +80,13 @@ def register():
         else:
             return jsonify({'error': f'Username {username} already exists'}), 400
     except IntegrityError as e:
-        db.session.rollback()  # Rollback the transaction to prevent partially committed data
+        db.session.rollback() 
         return jsonify({'error': 'IntegrityError - Unique constraint violated'}), 400
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 
-@app.route("/login", methods=['POST','GET'])
+@app.route("/login", methods=['POST'])
 def login():
     data = request.json
     username = data['username']
@@ -93,18 +103,18 @@ def login():
     else:
         return jsonify({"error": "User does not exist"}), 403
 
-
-
 @app.route("/products", methods=["POST", "GET"])
-# @token_required
-def prods():
+@token_required
+def prods(current_user):
+
+    print("--------------", current_user)
+
     if request.method == "GET":
         try:
             prods = Product.query.all()
             p_dict = []
             for prod in prods:
-                p_dict.append(
-                    {"id": prod.id, "name": prod.name,"cost": prod.cost, "price": prod.price})
+                p_dict.append({"id": prod.id, "name": prod.name, "cost": prod.cost, "price": prod.price, 'username': prod.username})
             return jsonify(p_dict)
         except Exception as e:
             print(e)
@@ -115,8 +125,12 @@ def prods():
         if request.is_json:
             try:
                 data = request.json
+
+                # Extract user_id from the current_user object
+                user_id = current_user.id
+
                 new_product = Product(
-                    name=data['name'], cost=data['cost'], price=data['price'])
+                    name=data['name'], cost=data['cost'], price=data['price'], user_id=user_id)
                 db.session.add(new_product)
                 db.session.commit()
                 r = "Product added successfully. ID: " + str(new_product.id)
@@ -130,8 +144,6 @@ def prods():
             return jsonify({"error": "Data is not JSON."}), 400
 
 
-# Task by Thursday
-# Get a single product in the route
 
 
 @app.route('/get-product<int:product_id>', methods=['GET'])
@@ -142,6 +154,7 @@ def get_product(product_id):
             return jsonify({
                 "id": prd.id,
                 "name": prd.name,
+                "cost": prd.cost,
                 "price": prd.price
             })
         else:
@@ -276,3 +289,5 @@ if __name__ == "__main__":
 #  Thursday tas
 # display your currency in your web app
 # comsume  other public API
+# Task by Thursday
+# Get a single product in the route
