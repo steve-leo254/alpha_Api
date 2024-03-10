@@ -1,18 +1,19 @@
+from datetime import timedelta
 from flask import jsonify
 import sentry_sdk
-from flask import flash, jsonify, request
+from flask import jsonify, request
 from sentry_sdk import capture_exception
-from flask_sqlalchemy import SQLAlchemy
-from dds import Product, User,app, db, Sale
+from dds import Product, app, db, Sale, User
 from flask_cors import CORS
-import requests
-from sqlalchemy import func
-from datetime import datetime, date
-import jwt 
+import jwt
+from flask_jwt_extended import unset_jwt_cookies, jwt_required
+from sqlalchemy import func,desc
 from functools import wraps
 import datetime
-from sqlalchemy.exc import IntegrityError
-from flask_jwt_extended import decode_token
+
+
+
+
 
 sentry_sdk.init(
     dsn="https://1f76b334106769b9d015a5d173862544@us.sentry.io/4506699319214080",
@@ -43,20 +44,12 @@ def token_required(f):
             data = jwt.decode(
                 token, app.config['SECRET_KEY'], algorithms=["HS256"])
             current_user = data['username']
-            
-             # Query the database to get the user based on the user ID
-            current_user = User.query.filter_by(username=current_user).first()
-
-            if not current_user:
-                return jsonify({'message': 'User not found!'}), 401
-
         except jwt.ExpiredSignatureError:
             return jsonify({'message': 'Token has expired!'}), 401
         except jwt.InvalidTokenError:
             return jsonify({'message': 'Invalid token!'}), 401
 
         return f(current_user, *args, **kwargs)
-
 
     return decorated
 
@@ -65,56 +58,56 @@ def token_required(f):
 
 @app.route('/register', methods=['POST'])
 def register():
-    try:
-        data = request.json
-        username = data['username']
+    data = request.json
+    username = data['username']
 
-        # Check if the username does not exist
-        if not User.query.filter_by(username=username).first():
-            new_user = User(username=username, password=data['password'])
-            db.session.add(new_user)
-            db.session.commit()
-            r = f"Successfully stored user with id: {str(new_user.id)}"
-            res = {"result": r}
-            return jsonify(res), 201
-        else:
-            return jsonify({'error': f'Username {username} already exists'}), 400
-    except IntegrityError as e:
-        db.session.rollback() 
-        return jsonify({'error': 'IntegrityError - Unique constraint violated'}), 400
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    # Check if the username does not exist
+    if not User.query.filter_by(username=username).first():
+        new_user = User(username=username, password=data['password'])
+        db.session.add(new_user)
+        db.session.commit()
+        r = f"successfully stored userid: {str(new_user.id)}"
+        res = {"result": r}
+        return jsonify(res), 201
+    else:
+        return jsonify({'error': f'Username {username} already exists'}), 400
 
 
-@app.route("/login", methods=['POST'])
+
+
+
+@app.route('/login', methods=['POST'])
 def login():
     data = request.json
     username = data['username']
     password = data['password']
 
-    # Assuming the password is stored as a string
-    user = User.query.filter_by(username=username).first()
+    # Query the database for the user
+    user = User.query.filter_by(username=username, password=password).first()
 
     if user:
 
-        token = jwt.encode({'username': username, 'exp': datetime.datetime.utcnow() 
-                            + datetime.timedelta(minutes=30)}, app.config['SECRET_KEY'])
-        return jsonify({"access_token": token}), 200
+        token = jwt.encode({'username': username, 'exp': datetime.datetime.utcnow()
+                            + datetime.timedelta(minutes=10)}, app.config['SECRET_KEY'])
+        return jsonify({'access_token': token}), 200
     else:
-        return jsonify({"error": "User does not exist"}), 403
+        return jsonify({'error': 'User does not exist'}), 404
+
+
 
 @app.route("/products", methods=["POST", "GET"])
 @token_required
 def prods(current_user):
 
-    print("--------------", current_user)
+    print("--------------",current_user)
 
     if request.method == "GET":
         try:
             prods = Product.query.all()
             p_dict = []
             for prod in prods:
-                p_dict.append({"id": prod.id, "name": prod.name, "cost": prod.cost, "price": prod.price, 'username': prod.username})
+                p_dict.append(
+                    {"id": prod.id, "name": prod.name,"cost": prod.cost, "price": prod.price,'user_id':prod.user_id})
             return jsonify(p_dict)
         except Exception as e:
             print(e)
@@ -125,9 +118,10 @@ def prods(current_user):
         if request.is_json:
             try:
                 data = request.json
-
-                # Extract user_id from the current_user object
-                user_id = current_user.id
+                username=current_user
+                user=User.query.filter_by(username=username).first()
+                if user:
+                    user_id = user.id
 
                 new_product = Product(
                     name=data['name'], cost=data['cost'], price=data['price'], user_id=user_id)
@@ -146,7 +140,7 @@ def prods(current_user):
 
 
 
-@app.route('/get-product<int:product_id>', methods=['GET'])
+@app.route('/get-product/<int:product_id>', methods=['GET'])
 def get_product(product_id):
     try:
         prd = Product.query.get(product_id)
@@ -167,13 +161,14 @@ def get_product(product_id):
 
 
 
-@app.route('/sale', methods=['GET', 'POST'])
+@app.route('/sales', methods=['GET', 'POST'])
+# @token_required
 def sales():
     if request.method == 'GET':
         try:
-            sale = Sale.query.all()
+            sales = Sale.query.all()
             s_dict = []
-            for sale in sale:
+            for sale in sales:
                 s_dict.append({"id": sale.id, "pid": sale.pid,
                               "quantity": sale.quantity, "created_at": sale.created_at})
             return jsonify(s_dict)
@@ -190,7 +185,7 @@ def sales():
                     'pid'), quantity=data.get('quantity'))
                 db.session.add(new_sale)
                 db.session.commit()
-                s = "sale added successfully." + str(new_sale.id)
+                s = "sales added successfully." + str(new_sale.id)
                 sel = {"result": s}
                 return jsonify(sel), 201
             except Exception as e:
@@ -201,6 +196,7 @@ def sales():
             return jsonify({"error": "Data is not JSON."}), 400
     else:
         return jsonify({"error": "Method not allowed."}), 400
+
 
 
 # @app.route('/dashboard', methods=['GET', 'POST'])
